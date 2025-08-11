@@ -1,0 +1,186 @@
+name: Deploy to AWS ECS
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      GITHUB_TOKEN:
+        required: true
+      OPENAI_API_KEY:
+        required: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Create ECS task definition
+      id: task-def
+      run: |
+        cat > task-definition.json << EOF
+        {
+          "family": "financial-auditor-${{ inputs.environment }}",
+          "networkMode": "awsvpc",
+          "requiresCompatibilities": ["FARGATE"],
+          "cpu": "1024",
+          "memory": "2048",
+          "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+          "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/financial-auditor-task-role",
+          "containerDefinitions": [
+            {
+              "name": "financial-auditor",
+              "image": "${{ inputs.image }}",
+              "essential": true,
+              "portMappings": [
+                {
+                  "containerPort": 8000,
+                  "protocol": "tcp"
+                }
+              ],
+              "environment": [
+                {
+                  "name": "FA_DEBUG",
+                  "value": "${{ inputs.environment == 'production' && 'false' || 'true' }}"
+                },
+                {
+                  "name": "FA_LOG_LEVEL",
+                  "value": "${{ inputs.environment == 'production' && 'INFO' || 'DEBUG' }}"
+                },
+                {
+                  "name": "FA_LLM_PROVIDER",
+                  "value": "bedrock"
+                },
+                {
+                  "name": "FA_BEDROCK_REGION",
+                  "value": "us-east-1"
+                },
+                {
+                  "name": "FA_ENABLE_METRICS",
+                  "value": "true"
+                }
+              ],
+              "secrets": [
+                {
+                  "name": "FA_GITHUB_TOKEN",
+                  "valueFrom": "arn:aws:ssm:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:parameter/financial-auditor/${{ inputs.environment }}/github-token"
+                },
+                {
+                  "name": "FA_GITHUB_REPO_OWNER",
+                  "valueFrom": "arn:aws:ssm:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:parameter/financial-auditor/${{ inputs.environment }}/github-repo-owner"
+                },
+                {
+                  "name": "FA_GITHUB_REPO_NAME",
+                  "valueFrom": "arn:aws:ssm:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:parameter/financial-auditor/${{ inputs.environment }}/github-repo-name"
+                }
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/aws/ecs/financial-auditor-${{ inputs.environment }}",
+                  "awslogs-region": "us-east-1",
+                  "awslogs-stream-prefix": "ecs"
+                }
+              },
+              "healthCheck": {
+                "command": [
+                  "CMD-SHELL",
+                  "curl -f http://localhost:8000/health || exit 1"
+                ],
+                "interval": 30,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 60
+              }
+            }
+          ]
+        }
+        EOF
+
+    - name: Create CloudWatch Log Group
+      run: |
+        aws logs create-log-group \
+          --log-group-name "/aws/ecs/financial-auditor-${{ inputs.environment }}" \
+          --region us-east-1 || true
+
+    - name: Register ECS Task Definition
+      id: register-task-def
+      run: |
+        TASK_DEF_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://task-definition.json \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        
+        echo "task_def_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+    - name: Update ECS Service
+      run: |
+        # Check if service exists
+        if aws ecs describe-services \
+          --cluster "financial-auditor-${{ inputs.environment }}" \
+          --services "financial-auditor-service" \
+          --query 'services[0].serviceName' \
+          --output text 2>/dev/null | grep -q "financial-auditor-service"; then
+          
+          echo "Updating existing service..."
+          aws ecs update-service \
+            --cluster "financial-auditor-${{ inputs.environment }}" \
+            --service "financial-auditor-service" \
+            --task-definition "${{ steps.register-task-def.outputs.task_def_arn }}" \
+            --force-new-deployment
+        else
+          echo "Creating new service..."
+          aws ecs create-service \
+            --cluster "financial-auditor-${{ inputs.environment }}" \
+            --service-name "financial-auditor-service" \
+            --task-definition "${{ steps.register-task-def.outputs.task_def_arn }}" \
+            --desired-count 1 \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-xxxxxxxxx],securityGroups=[sg-xxxxxxxxx],assignPublicIp=ENABLED}" \
+            --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:targetgroup/financial-auditor-${{ inputs.environment }}/xxxxxxxxx,containerName=financial-auditor,containerPort=8000"
+        fi
+
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for service to stabilize..."
+        aws ecs wait services-stable \
+          --cluster "financial-auditor-${{ inputs.environment }}" \
+          --services "financial-auditor-service"
+
+    - name: Get service status
+      run: |
+        aws ecs describe-services \
+          --cluster "financial-auditor-${{ inputs.environment }}" \
+          --services "financial-auditor-service" \
+          --query 'services[0].{Name:serviceName,Status:status,Running:runningCount,Desired:desiredCount}' \
+          --output table
+
+    - name: Create deployment summary
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Image:** ${{ inputs.image }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Task Definition:** ${{ steps.register-task-def.outputs.task_def_arn }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ✅ Deployed successfully" >> $GITHUB_STEP_SUMMARY

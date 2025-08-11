@@ -1,0 +1,143 @@
+name: Financial Document Audit
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'financial/**'
+      - '**/*pl*'
+      - '**/*balance*'
+      - '**/*P&L*'
+      - '**/*income*'
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Repository to audit (owner/name)'
+        required: false
+        default: ''
+      ref:
+        description: 'Git reference (branch/tag/commit)'
+        required: false
+        default: 'main'
+
+jobs:
+  audit:
+    name: Financial Document Audit
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+
+    - name: Configure environment
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        echo "FA_GITHUB_TOKEN=$GITHUB_TOKEN" >> $GITHUB_ENV
+        echo "FA_GITHUB_REPO_OWNER=${{ github.repository_owner }}" >> $GITHUB_ENV
+        echo "FA_GITHUB_REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
+        echo "FA_LLM_PROVIDER=openai" >> $GITHUB_ENV
+        echo "FA_OPENAI_API_KEY=$OPENAI_API_KEY" >> $GITHUB_ENV
+        echo "FA_LOG_LEVEL=INFO" >> $GITHUB_ENV
+
+    - name: Run Financial Analysis
+      id: audit
+      run: |
+        repo="${{ github.event.inputs.repository }}"
+        ref="${{ github.event.inputs.ref }}"
+        
+        if [ -z "$repo" ]; then
+          repo="${{ github.repository }}"
+        fi
+        
+        if [ -z "$ref" ]; then
+          ref="main"
+        fi
+        
+        echo "Analyzing repository: $repo at ref: $ref"
+        
+        # Run the financial auditor
+        python -m autonomous_financial_auditor.main analyze --repo "$repo" --ref "$ref"
+        
+        echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+    - name: Upload analysis logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: audit-logs
+        path: |
+          logs/
+          *.log
+
+    - name: Comment on PR (if applicable)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const exitCode = '${{ steps.audit.outputs.exit_code }}';
+          let message;
+          
+          if (exitCode === '0') {
+            message = '✅ **Financial Audit Passed**\n\nNo discrepancies found in financial documents. All consistency checks passed.';
+          } else if (exitCode === '2') {
+            message = '⚠️ **Financial Audit Found Issues**\n\nDiscrepancies detected in financial documents. Please check the created/updated GitHub issue for details.';
+          } else {
+            message = '❌ **Financial Audit Failed**\n\nThe audit process encountered an error. Please check the workflow logs for details.';
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: message
+          });
+
+    - name: Create summary
+      if: always()
+      run: |
+        echo "## Financial Audit Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        exit_code="${{ steps.audit.outputs.exit_code }}"
+        
+        case $exit_code in
+          0)
+            echo "✅ **Status:** PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "📊 **Result:** No discrepancies found" >> $GITHUB_STEP_SUMMARY
+            echo "🎯 **Action:** No action required" >> $GITHUB_STEP_SUMMARY
+            ;;
+          2)
+            echo "⚠️ **Status:** ISSUES FOUND" >> $GITHUB_STEP_SUMMARY
+            echo "📊 **Result:** Financial discrepancies detected" >> $GITHUB_STEP_SUMMARY
+            echo "🎯 **Action:** Review GitHub issues for details" >> $GITHUB_STEP_SUMMARY
+            ;;
+          *)
+            echo "❌ **Status:** FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "📊 **Result:** Audit process error" >> $GITHUB_STEP_SUMMARY
+            echo "🎯 **Action:** Check workflow logs" >> $GITHUB_STEP_SUMMARY
+            ;;
+        esac
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  financial-auditor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: financial-auditor
+    ports:
+      - "8000:8000"
+      - "9090:9090"  # Metrics port
+    environment:
+      # Application settings
+      - FA_DEBUG=false
+      - FA_LOG_LEVEL=INFO
+      - FA_HOST=0.0.0.0
+      - FA_PORT=8000
+      
+      # GitHub configuration (set these in .env file)
+      - FA_GITHUB_TOKEN=${GITHUB_TOKEN}
+      - FA_GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - FA_GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+      - FA_GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      
+      # LLM configuration
+      - FA_LLM_PROVIDER=${LLM_PROVIDER:-bedrock}
+      - FA_BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
+      - FA_BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - FA_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FA_OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      
+      # AWS configuration
+      - FA_AWS_REGION=${AWS_REGION:-us-east-1}
+      - FA_AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - FA_AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # Analysis configuration
+      - FA_ANALYSIS_CONFIDENCE_THRESHOLD=${ANALYSIS_CONFIDENCE_THRESHOLD:-0.8}
+      - FA_MAX_DISCREPANCY_AMOUNT=${MAX_DISCREPANCY_AMOUNT:-1000.0}
+      
+      # Monitoring
+      - FA_ENABLE_METRICS=true
+      - FA_METRICS_PORT=9090
+      - FA_CLOUDWATCH_LOG_GROUP=/aws/ecs/financial-auditor
+      - FA_CLOUDWATCH_METRICS_NAMESPACE=FinancialAuditor
+    
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    networks:
+      - financial-auditor-network
+
+  # Optional: Ollama service for local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - financial-auditor-network
+    profiles:
+      - ollama  # Only start with --profile ollama
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - financial-auditor-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - financial-auditor-network
+    profiles:
+      - monitoring
+
+volumes:
+  ollama_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  financial-auditor-network:
+    driver: bridge
