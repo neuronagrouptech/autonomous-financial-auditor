@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  auditor:
+    build: .
+    environment:
+      - GITHUB_REPO=tu_usuario/tu_repo
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - OPENSEARCH_HOST=search-tu-dominio.region.es.amazonaws.com
+      - DYNAMODB_TABLE=financial-audits
+      - AWS_REGION=us-east-1
+    command: python src/handler.py
