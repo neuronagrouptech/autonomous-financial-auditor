@@ -4,3 +4,4 @@ __pycache__/
 *.zip
 terraform/.terraform/
 terraform/terraform.tfstate*
+/venv

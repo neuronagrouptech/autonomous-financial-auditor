@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Total Current Assets",
+    "formula_symbolic": "Total Current Assets = Σ(Current Assets Accounts)",
+    "formula_explicit": "Total_Current_Assets = Cash + Accounts_Receivable + Inventory + Prepaid_Expenses",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "Total Non-Current Assets",
+    "formula_symbolic": "Total Non-Current Assets = Σ(Non-Current Assets Accounts)",
+    "formula_explicit": "Total_Non_Current_Assets = PPE + Intangible_Assets",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "TOTAL ASSETS",
+    "formula_symbolic": "TOTAL ASSETS = Total Current Assets + Total Non-Current Assets",
+    "formula_explicit": "TOTAL_ASSETS = Total_Current_Assets + Total_Non_Current_Assets",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "Total Current Liabilities",
+    "formula_symbolic": "Total Current Liabilities = Σ(Current Liabilities Accounts)",
+    "formula_explicit": "Total_Current_Liabilities = Accounts_Payable + Accrued_Expenses + Short_Term_Loans",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "Total Non-Current Liabilities",
+    "formula_symbolic": "Total Non-Current Liabilities = Σ(Non-Current Liabilities Accounts)",
+    "formula_explicit": "Total_Non_Current_Liabilities = Long_Term_Debt + Deferred_Tax_Liabilities",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "TOTAL LIABILITIES",
+    "formula_symbolic": "TOTAL LIABILITIES = Total Current Liabilities + Total Non-Current Liabilities",
+    "formula_explicit": "TOTAL_LIABILITIES = Total_Current_Liabilities + Total_Non_Current_Liabilities",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "TOTAL EQUITY",
+    "formula_symbolic": "TOTAL EQUITY = Σ(Equity Accounts)",
+    "formula_explicit": "TOTAL_EQUITY = Common_Stock + Additional_Paid_In_Capital + Retained_Earnings",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "Accounting Equation",
+    "formula_symbolic": "TOTAL ASSETS = TOTAL LIABILITIES + TOTAL EQUITY",
+    "formula_explicit": "TOTAL_ASSETS = TOTAL_LIABILITIES + TOTAL_EQUITY",
+    "type": "interna",
+    "applies_to": ["Balance Sheet"]
+  }
+]

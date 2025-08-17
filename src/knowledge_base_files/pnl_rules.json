@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Total Revenue",
+    "formula_symbolic": "Total Revenue = Σ(Revenue Accounts)",
+    "formula_explicit": "Total_Revenue = Product_Sales + Service_Revenue",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Total COGS",
+    "formula_symbolic": "Total COGS = Σ(COGS Accounts)",
+    "formula_explicit": "Total_COGS = COGS_Products + COGS_Services",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Gross Profit",
+    "formula_symbolic": "Gross Profit = Total Revenue − Total COGS",
+    "formula_explicit": "Gross_Profit = Total_Revenue - Total_COGS",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Total Operating Expenses",
+    "formula_symbolic": "Total Operating Expenses = Σ(Operating Expenses Accounts)",
+    "formula_explicit": "Total_Operating_Expenses = R&D + Sales_Marketing + General_Admin + Depreciation_Amortization",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Operating Income",
+    "formula_symbolic": "Operating Income = Gross Profit − Total Operating Expenses",
+    "formula_explicit": "Operating_Income = Gross_Profit - Total_Operating_Expenses",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Total Other Income/Expenses",
+    "formula_symbolic": "Total Other Income/Expenses = Σ(Other Income/Expense Accounts)",
+    "formula_explicit": "Total_Other_IE = Other_Income + Interest_Expense",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Income Before Tax",
+    "formula_symbolic": "Income Before Tax = Operating Income + Total Other Income/Expenses",
+    "formula_explicit": "Income_Before_Tax = Operating_Income + Total_Other_IE",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  },
+  {
+    "name": "Net Income",
+    "formula_symbolic": "Net Income = Income Before Tax − Income Tax Expense",
+    "formula_explicit": "Net_Income = Income_Before_Tax - Income_Tax_Expense",
+    "type": "interna",
+    "applies_to": ["P&L"]
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Retained Earnings Reconciliation",
+    "formula_symbolic": "Retained Earnings (Current) − Retained Earnings (Previous) = Net Income − Dividends",
+    "formula_explicit": "RE_current - RE_previous = Net_Income - Dividends",
+    "type": "cruzada",
+    "applies_to": ["Balance Sheet", "P&L"]
+  },
+  {
+    "name": "Change in Cash",
+    "formula_symbolic": "Cash (Current) − Cash (Previous) = Net Cash Flow",
+    "formula_explicit": "Cash_Current - Cash_Previous = Net_Cash_Flow",
+    "type": "cruzada",
+    "applies_to": ["Balance Sheet", "Cash Flow"]
+  },
+  {
+    "name": "Assets Variation Match",
+    "formula_symbolic": "ΔAssets = ΔLiabilities + ΔEquity",
+    "formula_explicit": "(TOTAL_ASSETS_current - TOTAL_ASSETS_previous) = (TOTAL_LIABILITIES_current - TOTAL_LIABILITIES_previous) + (TOTAL_EQUITY_current - TOTAL_EQUITY_previous)",
+    "type": "cruzada",
+    "applies_to": ["Balance Sheet"]
+  },
+  {
+    "name": "Accounts Receivable Consistency",
+    "formula_symbolic": "ΔAccounts Receivable ≈ Sales on Credit",
+    "formula_explicit": "(AR_current - AR_previous) ≈ Credit_Sales",
+    "type": "cruzada",
+    "applies_to": ["Balance Sheet", "P&L"]
+  },
+  {
+    "name": "Depreciation Consistency",
+    "formula_symbolic": "Depreciation (P&L) ≈ Decrease in PPE + Intangibles (adjusted for asset purchases/sales)",
+    "formula_explicit": "Depreciation_Expense ≈ (PPE_previous + Intangibles_previous) - (PPE_current + Intangibles_current) + Asset_Purchases - Asset_Sales",
+    "type": "cruzada",
+    "applies_to": ["Balance Sheet", "P&L"]
+  }
+]

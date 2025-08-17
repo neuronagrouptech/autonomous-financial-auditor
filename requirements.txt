@@ -3,4 +3,7 @@ requests
 opensearch-py
 requests-aws4auth
 pytest
-
+pandas
+dotenv
+langchain
+langchain-aws
